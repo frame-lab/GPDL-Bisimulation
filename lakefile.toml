@@ -1,0 +1,6 @@
+name = "GPDL-Bisimulation"
+version = "0.1.0"
+defaultTargets = ["GPDLBisimulation"]
+
+[[lean_lib]]
+name = "GPDLBisimulation"
