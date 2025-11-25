@@ -4,3 +4,7 @@ defaultTargets = ["GPDLBisimulation"]
 
 [[lean_lib]]
 name = "GPDLBisimulation"
+
+[[require]]
+name = "mathlib"
+scope = "leanprover-community"
