@@ -16,6 +16,8 @@ variable
   [DecidableEq t]
   [DecidableEq σ]
 
+namespace GKAT
+
 inductive BExp (T : List t) : Type v
   | zero : BExp T
   | one : BExp T
@@ -309,3 +311,5 @@ def check_equivalence (e1 e2 : Exp σ T) : Bool :=
           (.do 'e')))
       (.assert 1)  : Exp Char ['b'])
 -/
+
+end GKAT
