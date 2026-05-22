@@ -12,40 +12,37 @@ section
 variable
   {σ : Type u}
   {t : Type v}
-  {T : List t}
   [DecidableEq t]
   [DecidableEq σ]
 
 namespace GKAT
 
-inductive BExp (T : List t) : Type v
-  | zero : BExp T
-  | one : BExp T
-  | prim : { b // b ∈ T } → BExp T
-  | and : BExp T → BExp T → BExp T
-  | or : BExp T → BExp T → BExp T
-  | not : BExp T → BExp T
-deriving Repr
+inductive BExp (t : Type v)
+  | zero : BExp t
+  | one : BExp t
+  | prim : t → BExp t
+  | and : BExp t → BExp t → BExp t
+  | or : BExp t → BExp t → BExp t
+  | not : BExp t → BExp t
+deriving Repr, DecidableEq
 
-instance : Zero (BExp T) where
+instance : Zero (BExp t) where
   zero := .zero
 
-instance : One (BExp T) where
+instance : One (BExp t) where
   one := .one
 
-inductive Exp (σ : Type u) (T : List t) : Type (max u v)
-  | do : σ → Exp σ T
-  | assert : BExp T → Exp σ T
-  | seq : Exp σ T → Exp σ T → Exp σ T
-  | if : BExp T → Exp σ T → Exp σ T → Exp σ T
-  | while : BExp T → Exp σ T → Exp σ T
+inductive Exp (σ : Type u) (t : Type v) : Type (max u v)
+  | do : σ → Exp σ t
+  | assert : BExp t → Exp σ t
+  | seq : Exp σ t → Exp σ t → Exp σ t
+  | if : BExp t → Exp σ t → Exp σ t → Exp σ t
+  | while : BExp t → Exp σ t → Exp σ t
 deriving Repr
-
-def At' (T : Finset t) := T.powerset
 
 def At (T : List t) := T.sublists
 
-def eval (v : List t) : BExp T → Bool
+def eval (v : List t) : BExp t → Bool
   | 0 => false
   | 1 => true
   | .prim b =>
@@ -54,17 +51,12 @@ def eval (v : List t) : BExp T → Bool
   | .or b c => eval v b || eval v c
   | .not b =>  ! eval v b
 
-
-inductive GuardedString (σ : Type u) (T : List t)
-  | final (state : { s // s ∈ At T }) : GuardedString σ T
-  | cons (state : { s // s ∈ At T }) (action : σ) (next : GuardedString σ T) : GuardedString σ T
-
 inductive two where
   | zero : two
   | one : two
 deriving DecidableEq, BEq
 
-def G (σ : Type u) (T : List t) (X : Type w) := List t → (two ⊕ σ × X)
+def G (σ : Type u) (t : Type v) (X : Type w) := List t → (two ⊕ σ × X)
 
 instance : Zero (two ⊕ σ × X) where
   zero := Sum.inl two.zero
@@ -72,29 +64,21 @@ instance : Zero (two ⊕ σ × X) where
 instance : One (two ⊕ σ × X) where
   one := Sum.inl two.one
 
-structure GCoalgebra (σ : Type u) (T : List t) where
+structure GCoalgebra (σ : Type u) (t : Type v) where
   states : Nat
-  map : Fin states → G σ T (Fin states)
+  map : Fin states → G σ t (Fin states)
 
-structure GAutomaton (σ : Type u) (T : List t) where
+structure GAutomaton (σ : Type u) (t : Type v) where
   states : Nat
-  map : Fin states → G σ T (Fin states)
+  map : Fin states → G σ t (Fin states)
   start : Fin states
 
-def accept (X : GAutomaton σ T) (s : Fin X.states) : GuardedString σ T → Prop
-  | .final α => X.map s α = 1
-  | .cons α p x => ∃ (t : Fin X.states), X.map s α = Sum.inr (p, t) ∧ accept X t x
-
-def l (X : GAutomaton σ T) (s : Fin X.states) := {α : GuardedString σ T // accept X s α}
-
-def language (X : GAutomaton σ T) := l X X.start
-
-instance : One (G σ T X) where
+instance : One (G σ t X) where
   one := fun _ ↦ 1
 
-def uniform_continuation (X : GCoalgebra σ T)
+def uniform_continuation (X : GCoalgebra σ t)
   (Y : Fin X.states → Bool)
-  (h : G σ T (Fin X.states)) : GCoalgebra σ T :=
+  (h : G σ t (Fin X.states)) : GCoalgebra σ t :=
   ⟨
     X.states,
     fun x α ↦
@@ -103,7 +87,7 @@ def uniform_continuation (X : GCoalgebra σ T)
       else X.map x α
   ⟩
 
-def coproduct (X Y : GCoalgebra σ T) : GCoalgebra σ T :=
+def coproduct (X Y : GCoalgebra σ t) : GCoalgebra σ t :=
   ⟨
     (X.states + Y.states),
     fun z α ↦
@@ -125,7 +109,7 @@ def coproduct (X Y : GCoalgebra σ T) : GCoalgebra σ T :=
   ⟩
 
 
-def exp2coalgebra_aux : Exp σ T → ((X : GCoalgebra σ T) × G σ T (Fin X.states))--(two ⊕ σ × X.states))
+def exp2coalgebra_aux : Exp σ t → ((X : GCoalgebra σ t) × G σ t (Fin X.states))--(two ⊕ σ × X.states))
   | .assert b =>
     ⟨
       ⟨0, fun ⟨n, lt⟩ => False.elim ((Nat.not_lt_zero n) lt)⟩,
@@ -179,7 +163,7 @@ def exp2coalgebra_aux : Exp σ T → ((X : GCoalgebra σ T) × G σ T (Fin X.sta
     ⟩
   | .while b f =>
     let ⟨⟨Xf, δf⟩, i_f⟩ := exp2coalgebra_aux f
-    let i_e : G σ T (Fin Xf) :=
+    let i_e : G σ t (Fin Xf) :=
       fun α ↦
         if !(eval α b) then 1
         else
@@ -192,7 +176,7 @@ def exp2coalgebra_aux : Exp σ T → ((X : GCoalgebra σ T) × G σ T (Fin X.sta
       i_e
     ⟩
 
-def exp2automaton (e : Exp σ T) : GAutomaton σ T :=
+def exp2automaton (e : Exp σ t) : GAutomaton σ t :=
   let ⟨⟨s, m⟩, i_e⟩ := exp2coalgebra_aux e
   ⟨
     s + 1,
@@ -212,13 +196,13 @@ def exp2automaton (e : Exp σ T) : GAutomaton σ T :=
     ⟨0, Nat.zero_lt_succ s⟩
   ⟩
 
-def accepting {X : GCoalgebra σ T} (s : Fin X.states) : Bool :=
+def accepting {X : GCoalgebra σ t} (T : List t) (s : Fin X.states): Bool :=
   List.any (At T) (fun α ↦ X.map s α = 1)
 
-def not_dead_states (X : GCoalgebra σ T) : Vector Bool X.states :=
+def not_dead_states (X : GCoalgebra σ t) (T : List t) : Vector Bool X.states :=
   let rec accepting_in_steps (N : Nat) : Vector Bool X.states :=
     match N with
-    | 0 => Vector.map accepting (Vector.finRange X.states)
+    | 0 => Vector.map (accepting T) (Vector.finRange X.states)
     | n + 1 =>
       (Vector.finRange X.states).map (fun x ↦
         (accepting_in_steps n).get x ||
@@ -228,18 +212,19 @@ def not_dead_states (X : GCoalgebra σ T) : Vector Bool X.states :=
           | _ => false ))
   accepting_in_steps X.states
 
-def normalize (X : GCoalgebra σ T) : GCoalgebra σ T :=
-  let not_dead_states_x := not_dead_states X
+def normalize (T : List t) (X : GAutomaton σ t) : GAutomaton σ t :=
+  let not_dead_states_x := not_dead_states ⟨X.states, X.map⟩ T
   ⟨
     X.states,
     fun x α ↦
       match X.map x α with
       | .inr (_, b) =>
           if (not_dead_states_x.get b) then X.map x α else 0
-      | _ => X.map x α
+      | _ => X.map x α,
+    X.start
   ⟩
 
-def inner_loop_aux (X Y : GAutomaton σ T) (x : Fin X.states) (y : Fin Y.states)
+def inner_loop_aux (X Y : GAutomaton σ t) (x : Fin X.states) (y : Fin Y.states)
       (A : List (List t)) (Q : Queue (Fin X.states × Fin Y.states)) :=
       match A with
       | [] => (Q, true)
@@ -255,13 +240,15 @@ def inner_loop_aux (X Y : GAutomaton σ T) (x : Fin X.states) (y : Fin Y.states)
           else (Queue.empty, false)
         | _, _ => (Queue.empty, false)
 
-def inner_loop (X Y : GAutomaton σ T)
+def inner_loop (T : List t)
+                (X Y : GAutomaton σ t)
                 (x : Fin X.states) (y : Fin Y.states)
                 (Q : Queue (Fin X.states × Fin Y.states))
                 : Queue (Fin X.states × Fin Y.states) × Bool :=
     inner_loop_aux X Y x y (At T) Q
 
-partial def outer_loop (X Y : GAutomaton σ T)
+partial def outer_loop (T : List t)
+                (X Y : GAutomaton σ t)
                 (Q : Queue (Fin X.states × Fin Y.states))
                 (UF : UnionFind) : Bool :=
     match Q.dequeue? with
@@ -269,47 +256,77 @@ partial def outer_loop (X Y : GAutomaton σ T)
     | some ⟨⟨x, y⟩, Q'⟩ =>
       let ⟨UF', eq⟩ := UF.checkEquiv! x (y + X.states)
       if eq then
-        outer_loop X Y Q' UF'
+        outer_loop T X Y Q' UF'
       else
-        let ⟨Q'', B'⟩ := inner_loop X Y x y Q'
+        let ⟨Q'', B'⟩ := inner_loop T X Y x y Q'
         if B'
-        then outer_loop X Y Q'' (UF'.union! x (y + X.states))
+        then outer_loop T X Y Q'' (UF'.union! x (y + X.states))
         else false
 
-def bisimulation (X Y : GAutomaton σ T) : Bool :=
-  outer_loop X Y
+def bisimulation (T : List t) (X Y : GAutomaton σ t) : Bool :=
+  outer_loop T X Y
     (Queue.enqueue (X.start, Y.start) Queue.empty)
     (UnionFind.mkEmpty (X.states + Y.states))
 
-def check_equivalence (e1 e2 : Exp σ T) : Bool :=
-  bisimulation (exp2automaton e1) (exp2automaton e2)
+def atomic_tests_bexp : BExp t → List t
+  | .zero => []
+  | .one => []
+  | .prim b => [b]
+  | .and b c => List.union (atomic_tests_bexp b) (atomic_tests_bexp c)
+  | .or b c => List.union (atomic_tests_bexp b) (atomic_tests_bexp c)
+  | .not b => atomic_tests_bexp b
+
+def atomic_tests : Exp σ t -> List t
+  | .do _ => []
+  | .assert b => atomic_tests_bexp b
+  | .seq f g => List.union (atomic_tests f) (atomic_tests g)
+  | .if b f g => List.union (atomic_tests_bexp b) (List.union (atomic_tests f) (atomic_tests g))
+  | .while b f => List.union (atomic_tests_bexp b) (atomic_tests f)
+
+def check_equivalence (e1 e2 : Exp σ t) : Bool :=
+  let T : List t := List.union (atomic_tests e1) (atomic_tests e2)
+  bisimulation T
+    (normalize T (exp2automaton e1))
+    (normalize T (exp2automaton e2))
+
+
 
 #eval check_equivalence
-  (.do 'e' : Exp Char ['b'])
-  (.seq  (.assert 1) (.do 'e' ): Exp Char ['b'])
+  (.do 'e' : Exp Char Char)
+  (.seq  (.assert 1) (.do 'e' ): Exp Char Char)
 
 #eval check_equivalence
-  (.if (.prim ⟨'b', List.mem_singleton_self 'b'⟩)
+  (.if (.prim 'b')
     (.do 'e') (.do 'f'))
-  (.if (.not (.prim ⟨'b', List.mem_singleton_self 'b'⟩))
+  (.if (.not (.prim 'b'))
     (.do 'f') (.do 'e'))
 
 #eval check_equivalence
-  (.while (.prim ⟨'b', List.mem_singleton_self 'b'⟩)
+  (.while (.prim 'b')
     (.do 'e'))
-  (.while (.not (.prim ⟨'b', List.mem_singleton_self 'b'⟩))
+  (.while (.not (.prim 'b'))
     (.do 'e'))
 
-/-
 #eval check_equivalence
-    (.while (.prim ⟨'b', List.mem_singleton_self 'b'⟩)
-      (.do 'e')  : Exp Char ['b'])
-    (.if (.prim ⟨'b', List.mem_singleton_self 'b'⟩)
-      (.seq
-        (.do 'e')
-        (.while (.prim ⟨'b', List.mem_singleton_self 'b'⟩)
-          (.do 'e')))
-      (.assert 1)  : Exp Char ['b'])
--/
+  (.if (.prim 'b')
+    (.if (.prim 'c')
+      (.do 'f')
+      (.do 'g'))
+    (.do 'g'))
+  (.if (.prim 'c')
+    (.if (.prim 'b')
+      (.do 'f')
+      (.do 'g'))
+    (.do 'g'))
+
+#eval check_equivalence
+  (.if (.prim 'b')
+    (.if (.prim 'c')
+      (.do 'f')
+      (.do 'g'))
+    (.do 'g'))
+  (.if (.and (.prim 'b') (.prim 'c'))
+    (.do 'f')
+    (.do 'g'))
 
 end GKAT
