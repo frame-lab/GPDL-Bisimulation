@@ -12,19 +12,23 @@ section
 variable
   {σ : Type u}
   {t : Type v}
-  [DecidableEq t]
-  [DecidableEq σ]
+  [BEq σ]
+  [BEq t]
 
 namespace GKAT
 
 inductive BExp (t : Type v)
-  | zero : BExp t
   | one : BExp t
   | prim : t → BExp t
   | and : BExp t → BExp t → BExp t
-  | or : BExp t → BExp t → BExp t
   | not : BExp t → BExp t
-deriving Repr, DecidableEq
+deriving Repr, BEq
+
+def BExp.zero : BExp t :=
+  .not .one
+
+def BExp.or : BExp t → BExp t → BExp t
+  | b, c => (.not (.and (.not b) (.not c)))
 
 instance : Zero (BExp t) where
   zero := .zero
@@ -38,15 +42,14 @@ inductive Exp (σ : Type u) (t : Type v) : Type (max u v)
   | seq : Exp σ t → Exp σ t → Exp σ t
   | if : BExp t → Exp σ t → Exp σ t → Exp σ t
   | while : BExp t → Exp σ t → Exp σ t
-deriving Repr
+deriving Repr, BEq
 
 def At (T : List t) := T.sublists
 
 def eval (v : List t) : BExp t → Bool
   | 0 => false
   | 1 => true
-  | .prim b =>
-    b ∈ v
+  | .prim b => v.contains b
   | .and b c => eval v b && eval v c
   | .or b c => eval v b || eval v c
   | .not b =>  ! eval v b
@@ -82,7 +85,7 @@ def uniform_continuation (X : GCoalgebra σ t)
   ⟨
     X.states,
     fun x α ↦
-      if (Y x) ∧ (X.map x α = 1)
+      if (Y x) ∧ (X.map x α == 1)
       then h α
       else X.map x α
   ⟩
@@ -197,7 +200,7 @@ def exp2automaton (e : Exp σ t) : GAutomaton σ t :=
   ⟩
 
 def accepting {X : GCoalgebra σ t} (T : List t) (s : Fin X.states): Bool :=
-  List.any (At T) (fun α ↦ X.map s α = 1)
+  List.any (At T) (fun α ↦ X.map s α == 1)
 
 def not_dead_states (X : GCoalgebra σ t) (T : List t) : Vector Bool X.states :=
   let rec accepting_in_steps (N : Nat) : Vector Bool X.states :=
@@ -235,7 +238,7 @@ def inner_loop_aux (X Y : GAutomaton σ t) (x : Fin X.states) (y : Fin Y.states)
           then inner_loop_aux X Y x y A' Q
           else (Q, false)
         | .inr (p1, x'), .inr (p2, y') =>
-          if p1 = p2
+          if p1 == p2
           then inner_loop_aux X Y x y A' (Q.enqueue (x', y'))
           else (Queue.empty, false)
         | _, _ => (Queue.empty, false)
