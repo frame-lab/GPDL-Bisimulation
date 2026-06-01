@@ -28,10 +28,12 @@ def Formula.box : GKAT.Exp σ t → Formula σ t → Formula σ t
   | π, φ => .neg (.diamond π (.neg φ))
 
 structure Model (σ : Type u) (t : Type v) where
-  W : Type w
-  Ws : List W
-  R : σ → W → Option W
-  V : t → List W
+  W : Nat
+  R : σ → Fin W → Option (Fin W)
+  V : t → List (Fin W)
+
+instance : ToString (Model σ t) where
+  toString M := toString M.W
 
 def bexp2formula : GKAT.BExp t → Formula σ t
   | .one => .top
@@ -314,19 +316,17 @@ partial def closed_tableau''
     | f' =>
       closed_tableau'' ((s, f) :: exp) fs
   | [] =>
+    let ws : List (List σ) := (exp.map (fun (s, _) => s)).dedup
     some {
-      W := List σ
-      Ws := (exp.map (fun (s, _) => s)).dedup
+      W := ws.length
       R :=
         fun p s =>
-          if (exp.any (fun (s', _) => s' == (p :: s)))
-          then some (p :: s)
-          else none
+          ws.findFinIdx? (· == (p :: (ws.get s)))
       V := fun b =>
         (exp.filterMap
           (fun (s, f) =>
             if f == .atom_prop b
-            then some s
+            then ws.finIdxOf? s
             else none))
     }
 
@@ -344,5 +344,4 @@ def f2 : Formula Char Char :=
     (.diamond (.do 'p') (.atom_prop 'f'))
 
 
-
-#eval closed_tableau' [] [([], (.neg f2))]
+#eval closed_tableau'' [] [([], (.neg f1))]
